@@ -43,6 +43,9 @@ final class BottomSheetNavigationManager {
     
     private var sheets = [BottomSheetItem]()
     weak var containerView: ContainerView?
+    var topItemScrollView: UIScrollView? {
+        return sheets.last?.bottomSheetViewController?.scrollView
+    }
     
     init(containerView: ContainerView) {
         self.containerView = containerView
@@ -54,6 +57,8 @@ final class BottomSheetNavigationManager {
         }
         
         self.containerView?.show(bottomSheetViewController: vc)
+        
+        self.sheets.append(bottomSheetItem)
     }
     
     public func dismiss(bottomSheetItem: BottomSheetItem, animated: Bool = false) {
@@ -81,6 +86,10 @@ class ContainerViewController: UIViewController {
     private lazy var navigationManager: BottomSheetNavigationManager = {
         return BottomSheetNavigationManager(containerView: self.containerView)
     }()
+    
+    private var bottomSheetScrollView: UIScrollView? {
+        return self.navigationManager.topItemScrollView
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -119,7 +128,7 @@ class ContainerViewController: UIViewController {
         
         switch gestureRecognizer.state {
         case .began:
-            self.bottomViewController.tableView.isScrollEnabled = false
+            self.bottomSheetScrollView?.isScrollEnabled = false
             break
         case .changed:
             let newTopDistance = containerView.sheetBackgroundView!.frame.origin.y + point.y
@@ -127,7 +136,7 @@ class ContainerViewController: UIViewController {
             containerView.topDistance = min(max(0, defaultTopDistance) ,max(0, newTopDistance))
             gestureRecognizer.setTranslation(.zero, in: gestureView)
         case .ended, .cancelled:
-            self.bottomViewController.tableView.isScrollEnabled = true
+            self.bottomSheetScrollView?.isScrollEnabled = true
             break
         default:
             break
@@ -149,8 +158,12 @@ extension ContainerViewController: UIGestureRecognizerDelegate {
             return true
         }
         
+        guard let scrollView = self.bottomSheetScrollView else {
+            return false
+        }
+        
         let point = gestureRecognizer.translation(in: gestureView)
-        let contentOffset = bottomViewController.tableView.contentOffset.y + bottomViewController.tableView.contentInset.top
+        let contentOffset = scrollView.contentOffset.y + scrollView.contentInset.top
         return contentOffset == 0 && point.y > 0
     }
     
