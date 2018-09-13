@@ -35,4 +35,10 @@ class BottomSheetBackgroundView: UIView {
                               size: CGSize(width: bounds.size.width + borderWidth * 2,
                                            height: bounds.size.height))
     }
+    
+    func removeAllSubViews() {
+        for view in self.subviews {
+            view.removeFromSuperview()
+        }
+    }
 }

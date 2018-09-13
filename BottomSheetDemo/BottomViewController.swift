@@ -64,6 +64,22 @@ extension BottomViewController: UITableViewDataSource, UITableViewDelegate {
     }
     
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        cell.textLabel?.text = "Row - \(indexPath.row)"
+        if indexPath.row == 7 {
+            cell.textLabel?.text = " ------- Dismiss --------"
+        } else {
+            cell.textLabel?.text = "Row - \(indexPath.row) - Open new sheet"
+        }
+        
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        
+        if indexPath.row == 7 {
+            self.containerViewControllerDelegate?.dismissViewController(animated: true)
+            return
+        }
+        
+        let anotherVC = BottomViewController()
+        self.containerViewControllerDelegate?.showViewController(anotherVC, animated: true)
     }
 }

@@ -30,7 +30,7 @@ protocol BottomSheet: class {
 typealias BottomSheetViewController = UIViewController & BottomSheet
 
 final class BottomSheetItem {
-    var topDistance: CGFloat = 0
+    var topDistance: CGFloat = 100
     weak var bottomSheetViewController: BottomSheetViewController?
     
     init(topDistance: CGFloat, bottomSheet: BottomSheetViewController) {
@@ -46,27 +46,98 @@ final class BottomSheetNavigationManager {
     var topItemScrollView: UIScrollView? {
         return sheets.last?.bottomSheetViewController?.scrollView
     }
+    //plus 1 to make sure its go out of bound
+    var heightTomoveBottomSheetOutOfBound = UIScreen.main.bounds.size.height + 1
     
     init(containerView: ContainerView) {
         self.containerView = containerView
     }
     
-    public func show(bottomSheetItem: BottomSheetItem, animated: Bool = false) {
+    public func show(bottomSheetItem: BottomSheetItem,
+                     animated: Bool = false,
+                     completion: (()->Void)? = nil) {
         guard let vc = bottomSheetItem.bottomSheetViewController else {
             return
         }
         
-        self.containerView?.show(bottomSheetViewController: vc)
+        let addBottomSheet = {
+            self.containerView?.show(bottomSheetViewController: vc)
+            self.sheets.append(bottomSheetItem)
+            
+            guard animated else {
+                self.containerView?.topDistance = bottomSheetItem.topDistance
+                self.containerView?.layoutIfNeeded()
+                completion?()
+                return
+            }
+            
+            self.showPresentAnimation(bottomSheetItem: bottomSheetItem) {
+                completion?()
+            }
+        }
         
-        self.sheets.append(bottomSheetItem)
+        if let topItem = sheets.last {
+            self.dismiss(bottomSheetItem: topItem, animated: animated) {
+                addBottomSheet()
+            }
+        } else {
+            addBottomSheet()
+        }
     }
     
-    public func dismiss(bottomSheetItem: BottomSheetItem, animated: Bool = false) {
-        
+    private func showPresentAnimation(bottomSheetItem: BottomSheetItem,
+                                      completion: (()->Void)? = nil) {
+        UIView.animate(withDuration: 0.3,
+                       animations: {
+                        self.containerView?.topDistance = bottomSheetItem.topDistance
+                        self.containerView?.layoutIfNeeded()
+        },
+                       completion: { _ in
+                        completion?()
+        })
     }
     
-    public func dismissTopItem(animated: Bool = false) {
+    private func dismiss(bottomSheetItem: BottomSheetItem,
+                         animated: Bool = false,
+                         completion: (()->Void)? = nil) {
         
+        let distance = containerView?.topDistance ?? bottomSheetItem.topDistance
+        bottomSheetItem.topDistance = distance
+        guard animated else {
+            self.containerView?.topDistance = self.heightTomoveBottomSheetOutOfBound
+            completion?()
+            return
+        }
+        
+        UIView.animate(withDuration: 0.3,
+                       animations: {
+                        self.containerView?.topDistance = self.heightTomoveBottomSheetOutOfBound
+                        self.containerView?.layoutIfNeeded()
+        },
+                       completion: { _ in
+                        self.containerView?.sheetBackgroundView?.removeAllSubViews()
+                        completion?()
+        })
+    }
+    
+    public func dismissTopItem(animated: Bool = false, completion: (()->Void)? = nil) {
+        guard let topItem = self.sheets.last else {
+            completion?()
+            return
+        }
+        
+        self.dismiss(bottomSheetItem: topItem, animated: true) {
+            self.sheets.removeLast()
+            guard let secondTopItem = self.sheets.last,
+                let vc = secondTopItem.bottomSheetViewController else {
+                completion?()
+                return
+            }
+            self.containerView?.show(bottomSheetViewController: vc)
+            self.showPresentAnimation(bottomSheetItem: secondTopItem) {
+                completion?()
+            }
+        }
     }
 }
 
@@ -110,6 +181,7 @@ class ContainerViewController: UIViewController {
         mainViewController.didMove(toParentViewController: self)
         bottomViewController.didMove(toParentViewController: self)
         
+        self.bottomViewController.containerViewControllerDelegate = self
         self.showViewController(self.bottomViewController)
         containerView.topDistance = defaultTopDistance
         setupPanGesture()
@@ -174,12 +246,16 @@ extension ContainerViewController: UIGestureRecognizerDelegate {
 
 extension ContainerViewController: ContainerViewControllerDelegate {
     func dismissViewController(animated: Bool = false) {
-        
+        self.navigationManager.dismissTopItem(animated: animated)
     }
     
     func showViewController(_ viewController: BottomSheetViewController, animated: Bool = false) {
-        
         let bottomSheetItem = BottomSheetItem(topDistance: self.defaultTopDistance, bottomSheet: viewController)
-        self.navigationManager.show(bottomSheetItem: bottomSheetItem)
+        
+        viewController.containerViewControllerDelegate = self
+        addChildViewController(viewController)
+        self.navigationManager.show(bottomSheetItem: bottomSheetItem, animated: animated) {
+            viewController.didMove(toParentViewController: self)
+        }
     }
 }
